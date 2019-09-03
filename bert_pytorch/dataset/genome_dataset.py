@@ -9,7 +9,7 @@ import collections
 
 
 GeneInterval = collections.namedtuple(
-    'GeneInterval', ['start', 'end', 'sequence']
+    'GeneInterval', ['start', 'end', 'sequence', 'strand']
 )
 
 def get_seq(x):
@@ -38,11 +38,48 @@ def get_operon(genes, idx, window_size):
     while (coord - genes[lidx].end) < window_size and lidx > 0:
         lidx = lidx - 1
 
-    while genes[ridx].start - coord) < window_size and ridx < len(genes):
+    while (genes[ridx].start - coord) < window_size and ridx < len(genes):
         ridx = ridx + 1
 
     return genes[lidx : idx] + genes[idx + 1 : ridx]
 
+
+class ExtractIntervals(object):
+    def __init__(self, window_size=10000):
+        self.window_size = window_size
+
+    def __call__(self, gb_file):
+        gb_record = SeqIO.read(open(gb_file, "r"), "genbank")
+        cds = list(filter(lambda x: x.type == 'CDS', gb_record.features))
+        starts = list(map(lambda x: int(x.location.start), cds))
+        ends = list(map(lambda x: int(x.location.end), cds))
+        strand = list(map(lambda x: x.strand, cds))
+        seqs = list(map(get_seq, cds))
+        res = zip(starts, ends, seqs, strand)
+
+        # TODO: will also need to factor in reverse complement
+
+        # sequences with start, end and position
+        res = list(filter(lambda x: len(x) > 0, res))
+        res = list(map(lambda x: GeneInterval(
+            start=x[0], end=x[1], sequence=x[2], strand=x[3]
+        ), res))
+        return res
+
+class SampleGenes(object):
+    def __init__(self, within_prob=0.5):
+        self.within_prob = within_prob
+
+    def __call__(self):
+        pass
+
+class MaskPeptides(object):
+    def __init__(self, mask_prob=0.8, swap_prob=0.25):
+        self.mask_prob = mask_prob
+        self.swap_prob = swap_prob
+
+    def __call__(self):
+        pass
 
 class GenomeDataset(Dataset):
     def __init__(self, genbank_directory, vocab, genbank_ext='.gb',
@@ -122,10 +159,10 @@ class GenomeDataset(Dataset):
         # TODO: will also need to factor in reverse complement
 
         # sequences with start, end and position
-        res = list(filter(lambda x: len(x) > 0))
+        res = list(filter(lambda x: len(x) > 0, res))
         res = list(map(lambda x: GeneInterval(
             start=x[0], end=x[1], sequence=x[2]
-        )))
+        ), res))
         return res
 
 
@@ -140,8 +177,8 @@ class PeptideVocab():
         # see https://www.bioinformatics.org/sms2/iupac.html
         self.mask = 'X'
         self.peptide_lookup = pd.Series(
-            np.arange(len(peptides))
-            index=peptides,
+            np.arange(len(peptides)),
+            index=peptides
         )
         self.peptides = set(peptides)
 
