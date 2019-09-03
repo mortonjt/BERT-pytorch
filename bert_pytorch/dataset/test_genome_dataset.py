@@ -36,11 +36,7 @@ class TestSampleGenes(unittest.TestCase):
     def setUp(self):
         self.record_name = os.path.join('./data/polyoma.gb')
 
-    def test_sample_genes(self):
-        np.random.seed(0)
-        samp_tfm = SampleGenes(num_sampled=2, within_prob = 0.9, window_size=100)
-
-        records = [
+        self.records = [
             GeneInterval(
                 268, 469,
                 ('MVLRQLSRQASVRVSKTWTGTKRRAQRIFIFILELLLEFCRGEDSVDGKNKSTTALPA'
@@ -66,6 +62,11 @@ class TestSampleGenes(unittest.TestCase):
             )
         ]
 
+
+    def test_sample_genes(self):
+        np.random.seed(0)
+        samp_tfm = SampleGenes(num_sampled=3, within_prob = 0.9, window_size=100)
+
         neighbor = GeneInterval(
             504, 1560,
             ('MGAALALLGDLVASVSEAAAATGFSVAEIAAGEAAAAIEVQIAS'
@@ -77,12 +78,13 @@ class TestSampleGenes(unittest.TestCase):
              'RASAKTTNKRRSRSSRS'), 1
         )
 
-        res = samp_tfm({'gene_intervals': records})
-        self.assertIn(neighbor in res['genes'])
-        self.assertIn(neighbor in res['next_genes'])
+        res = samp_tfm({'gene_intervals': self.records})
+        self.assertIn(neighbor, res['genes'])
+        self.assertIn(neighbor, res['next_genes'])
 
-    def test_avoid_clash(self):
-        pass
+        # test against duplicates
+        for i in range(2):
+            self.assertNotEqual(res['genes'][i], res['next_genes'][i])
 
 
 class TestGenomeDataset(unittest.TestCase):
