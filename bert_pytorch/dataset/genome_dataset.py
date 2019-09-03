@@ -1,22 +1,13 @@
 from torch.utils.data import Dataset
 import tqdm
 import torch
-import random
+import numpy as np
 from Bio import SeqIO
 import pandas as pd
 import glob
 import collections
+from util import draw_exclusive, get_context, get_seq, GeneInterval
 
-
-GeneInterval = collections.namedtuple(
-    'GeneInterval', ['start', 'end', 'sequence', 'strand']
-)
-
-def get_seq(x):
-    if 'translation' in x.qualifiers:
-        return x.qualifiers['translation'][0]
-    else:
-        return ''
 
 def get_operon(genes, idx, window_size):
     """ Retrieves genes within the window size surrounding gene
@@ -57,21 +48,64 @@ class ExtractIntervals(object):
         seqs = list(map(get_seq, cds))
         res = zip(starts, ends, seqs, strand)
 
-        # TODO: will also need to factor in reverse complement
-
         # sequences with start, end and position
         res = list(filter(lambda x: len(x) > 0, res))
         res = list(map(lambda x: GeneInterval(
             start=x[0], end=x[1], sequence=x[2], strand=x[3]
         ), res))
-        return res
+        return {'gene_intervals': res}
+
 
 class SampleGenes(object):
-    def __init__(self, within_prob=0.5):
-        self.within_prob = within_prob
+    def __init__(self, num_sampled, within_prob=0.5, window_size=10000):
+        """ Randomly samples genes within genome
 
-    def __call__(self):
-        pass
+        Parameters
+        ----------
+        num_sampled : int
+            Number of genes sampled per genome
+        within_prob : float
+            The probability of drawing a gene within the same operon
+        window_size : int
+            The radius of the operon (typically around 10kb)
+        """
+        self.num_sampled = num_sampled
+        self.within_prob = within_prob
+        self.window_size = window_size
+
+    def __call__(self, record):
+        """ Randomly samples genes are their paired genes
+
+        Parameters
+        ----------
+        record: dict
+           key : 'gene_intervals'
+           values : list of GeneInterval objects
+        """
+        gis = record['gene_intervals']
+        # draw genes
+        idx = np.random.randint(0, len(gis), size=self.num_sampled)
+        draws = np.random.random(size=self.num_sampled)
+
+        def draw_operon(x):
+            operon = get_context(gis, x, self.window_size)
+            # TODO: check this assumption carefully
+            mid = len(operon) // 2
+            print(operon)
+            i = draw_exclusive(len(operon), mid)
+            return gis[i]
+
+        # draw context genes
+        rand_operons = list(map(draw_operon, idx[draws<self.within_prob]))
+        rand_pairs = list(map(lambda x: draw_exclusive(len(gis), x),
+                              idx[draws>self.within_prob]))
+        rand_pairs = list(map(lambda i : gis[i], rand_pairs))
+        genes = list(map(lambda i: gis[i], idx))
+        rand_pairs = rand_operons + rand_pairs
+
+
+        return {'genes' : genes, 'next_genes' : rand_pairs}
+
 
 class MaskPeptides(object):
     def __init__(self, mask_prob=0.8, swap_prob=0.25):
