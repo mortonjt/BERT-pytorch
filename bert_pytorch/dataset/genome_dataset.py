@@ -5,6 +5,12 @@ import random
 from Bio import SeqIO
 import pandas as pd
 import glob
+import collections
+
+
+GeneInterval = collections.namedtuple(
+    'GeneInterval', ['start', 'end', 'sequence']
+)
 
 def get_seq(x):
     if 'translation' in x.qualifiers:
@@ -12,16 +18,41 @@ def get_seq(x):
     else:
         return ''
 
+def get_operon(genes, idx, window_size):
+    """ Retrieves genes within the window size surrounding gene
 
+    Parameters
+    ----------
+    genes : list of GeneInterval
+        List of genes
+    idx : int
+        Index of gene of interest
+    window_size : int
+        Size of window surrounding gene.
+    """
+    s, e = genes[idx].start, genes[idx].end
+    coord = (s + e) / 2
+    lidx = max(0, idx - 1)
+    ridx = min(idx + 1, len(genes))
+
+    while (coord - genes[lidx].end) < window_size and lidx > 0:
+        lidx = lidx - 1
+
+    while genes[ridx].start - coord) < window_size and ridx < len(genes):
+        ridx = ridx + 1
+
+    return genes[lidx : idx] + genes[idx + 1 : ridx]
 
 
 class GenomeDataset(Dataset):
     def __init__(self, genbank_directory, vocab, genbank_ext='.gb',
-                 within_operon_prob=0.5, mask_prob=0.8):
-        self.genbank_files = glob.glob(genbank_directory, '*' + genbank_ext)
+                 within_operon_prob=0.5, mask_prob=0.8, skipgram_size=10000):
 
+        self.genbank_files = glob.glob(genbank_directory, '*' + genbank_ext)
+        self.vocab = vocab.mask
         self.within_operon_prob = within_operon_prob
         self.mask_prob = mask_prob
+        self.skipgram_size = skipgram_size
 
     def __len__(self):
         return len(self.genbank_files)
@@ -29,13 +60,10 @@ class GenomeDataset(Dataset):
     def __getitem__(self, item):
         # return a list of items for each genome
         gb_file = self.genbank_files[item]
+        record = GenomeDataset.read_genbank(gb_file)
 
-
-        # get random gene
-        i = random.randint(len(res))
-        s, e, seq = res[i]
-
-        # get random next gene
+        # get random gene and another context gene
+        g1, g2, is_in_context = self.random.gene(genes)
 
         # get random peptide within gene
 
@@ -51,13 +79,37 @@ class GenomeDataset(Dataset):
                     yield k, v
 
     def random_peptide(self, gene):
-        pass
+        seq = list(gene.sequence)
+        output_label = []
+        for i, pep in enumerate(seq):
+            prob = random.random()
+            if prob < self.mask_prob:
+                seq[i] = self.vocab.mask
+                output_label.append(1)
+            else:
+                output_label.append(0)
+        return seq, output_label
 
-    def random_gene(self, genome):
-        pass
+    def random_gene(self, genes):
+        """ Retrieve random gene and a pair
+
+        Parameters
+        ----------
+        genes : list of GeneInterval
+            List of genes
+        """
+        idx = random.randint(len(genes))
+        operon = get_operon(genes, idx, window_size=self.window_size)
+        g1 = genes[idx]
+        if random.random() < within_operon_prob:
+            jdx = random.randint(len(operon))
+            return genes[idx], genes[jdx], 1
+        else:
+            jdx = random.randint(len(genes))
+            return genes[idx], genes[jdx], 0
 
     @staticmethod
-    def read_genbank(f):
+    def read_genbank(gb_file):
         """ """
         gb_record = SeqIO.read(open(gb_file, "r"), "genbank")
         cds = list(filter(lambda x: x.type == 'CDS', gb_record.features))
@@ -71,6 +123,9 @@ class GenomeDataset(Dataset):
 
         # sequences with start, end and position
         res = list(filter(lambda x: len(x) > 0))
+        res = list(map(lambda x: GeneInterval(
+            start=x[0], end=x[1], sequence=x[2]
+        )))
         return res
 
 
