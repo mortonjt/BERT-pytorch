@@ -84,23 +84,20 @@ class SampleGenes(object):
         """
         gis = record['gene_intervals']
         # draw genes
-        idx = np.random.randint(0, len(gis), size=self.num_sampled)
-        draws = np.random.random(size=self.num_sampled)
-
-        def draw_operon(x):
-            operon = get_context(gis, x, self.window_size)
-            i = np.random.randint(0, len(operon))
-            return gis[i]
-
-        # draw context genes (TODO: need to fix the rest of this function)
-        rand_operons = list(map(draw_operon, idx[draws<self.within_prob]))
-
-        rand_pairs = list(map(lambda x: draw_exclusive(len(gis), x),
-                              idx[draws>self.within_prob]))
-        rand_pairs = list(map(lambda i : gis[i], rand_pairs))
-        genes = list(map(lambda i: gis[i], idx))
-        rand_pairs = rand_operons + rand_pairs
-
+        idx = list(np.random.randint(0, len(gis), size=self.num_sampled))
+        draws = list(np.random.random(size=self.num_sampled))
+        def draw_gene(i, d):
+            if d <= self.within_prob:
+                # draw operon
+                operon = get_context(gis, i, self.window_size)
+                j = np.random.randint(0, len(operon))
+                return gis[j]
+            else:
+                # draw outside operon
+                j = draw_exclusive(len(gis), x)
+                return gis[j]
+        pairs = list(map(lambda i, d: draw_gene(i, d), zip(idx, draws)))
+        genes, next_genes = zip(*pairs)
         return {'genes' : genes, 'next_genes' : rand_pairs}
 
 
