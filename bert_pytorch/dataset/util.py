@@ -43,3 +43,42 @@ def draw_exclusive(n, idx):
     while j == idx:
         j = np.random.randint(n)
     return j
+
+def overlap(x, y):
+    """ Tests for overlap
+
+    Parameters
+    ----------
+    x : GeneInterval
+       First gene
+    y : GeneInterval
+       Second gene
+
+    Returns
+    -------
+    True if overlap.  False otherwise
+    """
+    return x.start <= y.end and y.start <= x.end
+
+def distance(x, y):
+    """ Computes minimum distance between genes
+
+    Parameters
+    ----------
+    x : GeneInterval
+       First gene
+    y : GeneInterval
+       Second gene
+
+    Returns
+    -------
+    int : Distance between genes
+    """
+    if overlap(x, y):
+        return 0
+    else:
+        return min(
+            abs(x.end - y.start),
+            abs(y.end - x.start)
+        )
+

@@ -2,7 +2,7 @@ import os
 import random
 import numpy as np
 from genome_dataset import GeneInterval, ExtractIntervals, SampleGenes
-
+from util import distance
 import unittest
 
 
@@ -34,7 +34,7 @@ class TestExtractIntervals(unittest.TestCase):
 class TestSampleGenes(unittest.TestCase):
 
     def setUp(self):
-        self.record_name = os.path.join('./data/polyoma.gb')
+        # self.record_name = os.path.join('./data/polyoma.gb')
 
         self.records = [
             GeneInterval(
@@ -63,9 +63,11 @@ class TestSampleGenes(unittest.TestCase):
         ]
 
 
-    def test_sample_genes(self):
+    def test_sample_within_operon(self):
         np.random.seed(0)
-        samp_tfm = SampleGenes(num_sampled=3, within_prob = 0.9, window_size=100)
+        window = 100
+        samp_tfm = SampleGenes(num_sampled=3, within_prob = 1,
+                               window_size=window)
 
         neighbor = GeneInterval(
             504, 1560,
@@ -85,6 +87,22 @@ class TestSampleGenes(unittest.TestCase):
         # test against duplicates
         for i in range(2):
             self.assertNotEqual(res['genes'][i], res['next_genes'][i])
+            self.assertLess(distance(res['genes'][i], res['next_genes'][i]),
+                            window)
+
+
+    def test_sample_within_operon(self):
+        window = 100
+        samp_tfm = SampleGenes(num_sampled=3, within_prob = 0,
+                               window_size=window)
+        res = samp_tfm({'gene_intervals': self.records})
+        is_random = False
+        # test against duplicates
+        for i in range(2):
+            self.assertNotEqual(res['genes'][i], res['next_genes'][i])
+            if distance(res['genes'][i], res['next_genes'][i]) > window:
+                is_random = True
+        self.assertTrue(is_random)
 
 
 class TestGenomeDataset(unittest.TestCase):

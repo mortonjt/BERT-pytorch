@@ -91,14 +91,14 @@ class SampleGenes(object):
                 # draw operon
                 operon = get_context(gis, i, self.window_size)
                 j = np.random.randint(0, len(operon))
-                return gis[j]
+                return gis[i], operon[j]
             else:
                 # draw outside operon
-                j = draw_exclusive(len(gis), x)
-                return gis[j]
-        pairs = list(map(lambda i, d: draw_gene(i, d), zip(idx, draws)))
+                j = draw_exclusive(len(gis), i)
+                return gis[i], gis[j]
+        pairs = list(map(lambda x: draw_gene(x[0], x[1]), zip(idx, draws)))
         genes, next_genes = zip(*pairs)
-        return {'genes' : genes, 'next_genes' : rand_pairs}
+        return {'genes' : genes, 'next_genes' : next_genes}
 
 
 class MaskPeptides(object):
