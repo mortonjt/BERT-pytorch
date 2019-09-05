@@ -1,5 +1,6 @@
 import numpy as np
 import collections
+from copy import copy
 
 
 GeneInterval = collections.namedtuple(
@@ -81,4 +82,16 @@ def distance(x, y):
             abs(x.end - y.start),
             abs(y.end - x.start)
         )
+
+def mask(x, prob=0.5, mask_chr='_'):
+    y = copy(x)
+    r = np.random.random(len(y))
+    y[r<prob] = mask_chr
+    return y
+
+def mutate(x, prob, vocab):
+    y = copy(x)
+    r = np.random.random(len(y))
+    y[r<prob] = vocab.random(np.sum(r<prob))
+    return y
 

@@ -1,7 +1,8 @@
 import os
 import random
 import numpy as np
-from genome_dataset import GeneInterval, ExtractIntervals, SampleGenes
+from genome_dataset import (GeneInterval, ExtractIntervals,
+                            SampleGenes, MaskPeptides)
 from util import distance
 import unittest
 
@@ -92,6 +93,7 @@ class TestSampleGenes(unittest.TestCase):
 
 
     def test_sample_within_operon(self):
+        np.random.seed(0)
         window = 100
         samp_tfm = SampleGenes(num_sampled=3, within_prob = 0,
                                window_size=window)
@@ -103,6 +105,72 @@ class TestSampleGenes(unittest.TestCase):
             if distance(res['genes'][i], res['next_genes'][i]) > window:
                 is_random = True
         self.assertTrue(is_random)
+
+
+class TestMaskPeptides(unittest.TestCase):
+    def setUp(self):
+        self.records = [
+            {
+                'gene': GeneInterval(
+                    268, 469,
+                    ('MVLRQLSRQASVRVSKTWTGTKRRAQRIFIFILELLLEFCRGEDSVDGKNKSTTALPA'
+                     'VKDSVKDS'), 1
+                ),
+                'next_gene': GeneInterval(
+                    250, 796,
+                    'MEIFPMDRLFKKNTMGNNIFHEIAIEGSLLMLRRVRDNVNEQMDTYLSD'
+                    'TNDQGETCIVIVADRHRGHLAIELIEIFVGLGADINGTDNGGNTALHYT'
+                    'VFNGDHALAEWLCQQPGINLNAANHDELTPLGLAIQLNIQSMKALLEAT'
+                    'GAIFHDIESNDSDNDDDDDDDDDDDDDVSTRRHG', -1),
+            },
+            {
+                'gene': GeneInterval(
+                    504, 1560,
+                    ('MGAALALLGDLVASVSEAAAATGFSVAEIAAGEAAAAIEVQIAS'
+                     'LATVEGITSTSEAIAAIGLTPQTYAVIAGAPGAIAGFAALIQTVTGISSLAQVGYRFF'
+                     'SDWDHKVSTVGLYQQSGMALELFNPDEYYDILFPGVNTFVNNIQYLDPRHWGPSLFAT'
+                     'ISQALWHVIRDDIPAITSQELQRRTERFFRDSLARFLEETTWTIVNAPVNFYNYIQDY'
+                     'YSNLSPIRPSMVRQVAEREGTQVNFGHTYRIDDADSIQEVTQRMELRNKENVHSGEFI'
+                     'EKTIAPGGANQRTAPQWMLPLLLGLYGTVTPALEAYEDGPNQKKRRVSRGSSQKAKGT'
+                     'RASAKTTNKRRSRSSRS'), 1),
+                'next_gene': GeneInterval(
+                    2240, 2810,
+                    ('MVNSCVLELFEGNTSAGNNIFHEIAMKGSLALLLEIRDKFDRPTDHALR'
+                     'EWNGHGETCLHLVALMNRGQNAIRMIDILVELGADLNAKNHLGHTLLHY'
+                     'ALENDDCELINWLLLHPEMNLSVRDYYDMQTDDDCFVEESEEEQEEEET'
+                     'EETEEEEKTRVSFSAFSDDLMDFESDEFDDIPRWIDELVSIL'), -1),
+            },
+            {
+                'gene': GeneInterval(
+                    861, 1560,
+                    ('MALELFNPDEYYDILFPGVNTFVNNIQYLDPRHWGPSLFATISQ'
+                     'ALWHVIRDDIPAITSQELQRRTERFFRDSLARFLEETTWTIVNAPVNFYNYIQDYYSN'
+                     'LSPIRPSMVRQVAEREGTQVNFGHTYRIDDADSIQEVTQRMELRNKENVHSGEFIEKT'
+                     'IAPGGANQRTAPQWMLPLLLGLYGTVTPALEAYEDGPNQKKRRVSRGSSQKAKGTRAS'
+                     'AKTTNKRRSRSSRS'), 1),
+                'next_gene': GeneInterval(
+                    2240, 2810,
+                    ('MVNSCVLELFEGNTSAGNNIFHEIAMKGSLALLLEIRDKFDRPTDHALR'
+                     'EWNGHGETCLHLVALMNRGQNAIRMIDILVELGADLNAKNHLGHTLLHY'
+                     'ALENDDCELINWLLLHPEMNLSVRDYYDMQTDDDCFVEESEEEQEEEET'
+                     'EETEEEEKTRVSFSAFSDDLMDFESDEFDDIPRWIDELVSIL'), -1)
+            }
+        ]
+
+
+    def test_mask(self):
+        np.random.seed(0)
+        mask_tfm = MaskPeptides(mask_prob=0.5, mutate_prob=0)
+        res = mask_tfm(self.records)
+        for r in res:
+            self.assertContains('_', r['gene_seq'])
+
+    def test_mutate(self):
+        np.random.seed(0)
+        mask_tfm = MaskPeptides(mask_prob=0.5, mutate_prob=0)
+        res = mask_tfm(self.records)
+        for r, o in zip(res, self.records):
+            self.assertNotEqual(r['gene_seq'], o.sequence)
 
 
 class TestGenomeDataset(unittest.TestCase):

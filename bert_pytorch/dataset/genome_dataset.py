@@ -6,7 +6,7 @@ from Bio import SeqIO
 import pandas as pd
 import glob
 import collections
-from util import draw_exclusive, get_context, get_seq, GeneInterval
+from util import draw_exclusive, get_context, get_seq, GeneInterval, mask
 
 
 def get_operon(genes, idx, window_size):
@@ -102,12 +102,34 @@ class SampleGenes(object):
 
 
 class MaskPeptides(object):
-    def __init__(self, mask_prob=0.8, swap_prob=0.25):
-        self.mask_prob = mask_prob
-        self.swap_prob = swap_prob
+    def __init__(self, mask_prob=0.8, mutate_prob=0.25,
+                 mask_chr='_'):
+        """ Masks peptides
 
-    def __call__(self):
-        pass
+        Parameters
+        ----------
+        mask_prob : float
+           Probability of masking a peptide
+        mutate_prob : float
+           Probability of mutation
+
+        Notes
+        -----
+        Is it worthwhile to think about throwing a blosum matrix?
+        """
+        self.mask_prob = mask_prob
+        self.mutate_prob = mutate_prob
+        self.mask_chr = mask_chr
+        self.vocab = PeptideVocab()
+
+    def __call__(self, sample):
+
+        gene, next_gene = sample['gene'], sample['next_gene']
+        gene_seq = mutate(gene.sequence,
+                          self.mutate_prob, self.vocab)
+        gene_seq = mask(gene_seq)
+        return {'gene_seq': gene_seq, 'next_seq': next_gene.sequence}
+
 
 class GenomeDataset(Dataset):
     def __init__(self, genbank_directory, vocab, genbank_ext='.gb',
@@ -196,19 +218,25 @@ class GenomeDataset(Dataset):
 
 class PeptideVocab():
 
-    def __init__(self, peptide_size=1):
+    def __init__(self):
+        """
+        Notes
+        -----
+        Q: Is it worthwhile to think about throwing a blosum matrix?
+
+        """
         # enumerate all peptides
-        peptides = ['A', 'C', 'D', 'E', 'F', 'G', 'H',
-                    'I', 'K', 'L', 'M', 'N', 'P', 'Q',
-                    'R', 'S', 'T', 'V', 'W', 'Y']
+        self.peptides = ['A', 'C', 'D', 'E', 'F', 'G', 'H',
+                         'I', 'K', 'L', 'M', 'N', 'P', 'Q',
+                         'R', 'S', 'T', 'V', 'W', 'Y']
         # this is the missing peptide by IUPAC standards
         # see https://www.bioinformatics.org/sms2/iupac.html
-        self.mask = 'X'
+        self.mask = '_'
         self.peptide_lookup = pd.Series(
-            np.arange(len(peptides)),
-            index=peptides
+            np.arange(len(self.peptides)),
+            index=self.peptides
         )
-        self.peptides = set(peptides)
+        self.peptide_set = set(self.peptides)
 
     def __getitem__(self, x):
         if x in self.peptides:
@@ -218,3 +246,8 @@ class PeptideVocab():
 
     def __contains__(self, x):
         return x in self.peptides
+
+    def random(self, size=1):
+        return np.random.choice(self.peptides, size=size)
+
+
